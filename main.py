@@ -1,4 +1,3 @@
-from ctypes import sizeof
 import npyscreen, curses, sqlite3, os
 
 def executeQuery(query, conn):
