@@ -16,7 +16,7 @@ class MyTUI(npyscreen.NPSAppManaged):
     def onStart(self):
         self.addForm("MAIN", SelectDatabase)
         self.addForm("TABLE", TablesMenu)
-        self.addForm("COLUMN", TableMenu)
+        self.addForm("VIEW", TableMenu)
         self.addForm("CREATE_TABLE", CreateTable)
         
     def onCleanExit(self):
@@ -46,7 +46,6 @@ class SelectDatabase(npyscreen.ActionForm):
                 sqlite3.connect(self.filename.value).close()
                 self.parentApp.database_connection = sqlite3.connect(self.filename.value)
                 self.parentApp.change_form("TABLE")
-                
     
 class TablesMenu(npyscreen.FormBaseNew):
     def create(self):
@@ -58,22 +57,29 @@ class TablesMenu(npyscreen.FormBaseNew):
         self.add(npyscreen.ButtonPress, name="View Table", when_pressed_function=self.viewTable, value=None)
         self.add(npyscreen.ButtonPress, name="Create Table", when_pressed_function=self.createTable, value=None)
         self.add(npyscreen.ButtonPress, name="Delete Table", when_pressed_function=self.deleteTable, value=None)
+        self.add(npyscreen.ButtonPress, name="Exit", when_pressed_function=exit, value=None)
+        
+    def createTable(self):
+        self.parentApp.change_form("CREATE_TABLE")
+
+    def deleteTable(self):
+        if self.option.value == [] or self.option.value == None:
+            npyscreen.notify_confirm(f"Please Select a table", editw=1, wide=False)
+        else:
+            prompt = npyscreen.notify_yes_no(f"Are you sure you want to delete {self.tables[self.option.value[0]][0]}?\nThere is no coming back", editw=1)
+            if prompt:
+                npyscreen.notify_wait(f"Deleting {self.tables[self.option.value[0]][0]}", wide=False)
+                executeQuery(f"DROP TABLE {self.tables[self.option.value[0]][0]}", self.parentApp.database_connection)
+            self.tables = executeQuery("SELECT name FROM sqlite_master WHERE type='table'", self.parentApp.database_connection)
+            self.option.value = []
+            self.option.values = [x[0] for x in self.tables]
+            self.option.display()
+
     def viewTable(self):
         if self.option.value == [] or self.option.value == None:
             npyscreen.notify_confirm(f"Please Select a table", editw=1, wide=False)
         else:
-            self.parentApp.change_form("COLUMN")
-    def createTable(self):
-        self.parentApp.change_form("CREATE_TABLE")
-    def deleteTable(self):
-        prompt = npyscreen.notify_yes_no(f"Are you sure you want to delete {self.tables[self.option.value[0]][0]}?\nThere is no coming back", editw=1)
-        if prompt:
-            npyscreen.notify_wait(f"Deleting {self.tables[self.option.value[0]][0]}", wide=False)
-            executeQuery(f"DROP TABLE {self.tables[self.option.value[0]][0]}", self.parentApp.database_connection)
-        self.tables = executeQuery("SELECT name FROM sqlite_master WHERE type='table'", self.parentApp.database_connection)
-        self.option.value = []
-        self.option.values = [x[0] for x in self.tables]
-        self.option.display()
+            self.parentApp.change_form("VIEW")
 
 class CreateTable(npyscreen.FormBaseNew):
     def create(self):
@@ -96,11 +102,14 @@ class CreateTable(npyscreen.FormBaseNew):
             npyscreen.notify_confirm("Please select a type", editw=1, wide=False)
         else:
             self.column_type.value = ["INTEGER", "TEXT", "REAL", "BLOB"][self.column_type.value[0]]
-            self.entries.append((self.column_name.value, self.column_type.value))
-            self.column_name.value = ""
-            self.column_type.value = [1,]
-            self.entries_display.value = "\n".join([f"{x[0]}: {x[1]}" for x in self.entries])
-            self.entries_display.display()
+            if self.column_name.value in [x[0] for x in self.entries]:
+                npyscreen.notify_confirm(f"Column {self.column_name.value} already exists", editw=1, wide=False)
+            else:            
+                self.entries.append((self.column_name.value, self.column_type.value))
+                self.column_name.value = ""
+                self.column_type.value = [1,]
+                self.entries_display.value = "\n".join([f"{x[0]}: {x[1]}" for x in self.entries])
+                self.entries_display.display()
 
     def on_cancel(self):
         self.parentApp.change_form("TABLE")
@@ -110,6 +119,8 @@ class CreateTable(npyscreen.FormBaseNew):
             npyscreen.notify_confirm("Table name cannot be empty", editw=1, wide=False)
         elif self.entries == []:
             npyscreen.notify_confirm("Please add atleast one column", editw=1, wide=False)
+        elif len(set([x[0] for x in self.entries])) != len(self.entries):
+            npyscreen.notify_confirm("Column names cannot be the same", editw=1, wide=False)
         elif executeQuery(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{self.table_name.value}'", self.parentApp.database_connection) != []:
             npyscreen.notify_confirm(f"Table: {self.table_name.value} already exists", editw=1, wide=False)
         else:
@@ -118,10 +129,9 @@ class CreateTable(npyscreen.FormBaseNew):
             self.parentApp.change_form("TABLE")
             npyscreen.notify_wait(f"Created Table {self.table_name.value}", wide=False)
         
-        
 class TableMenu(npyscreen.FormBaseNew):
     def create(self):
-        self.name = "View Table"
+        self.add(npyscreen.TitleText, name="Table Name: ", editable=False)
         
 def main():
     MyTUI().run()
