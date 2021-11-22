@@ -99,14 +99,16 @@ class CreateTable(npyscreen.FormBaseNew):
         self.parentApp.change_form("TABLE")
         
     def on_ok(self):
-        if self.entries == []:
+        if self.table_name.value == "":
+            npyscreen.notify_confirm("Table name cannot be empty", editw=1, wide=False)
+        elif self.entries == []:
             npyscreen.notify_confirm("Please add atleast one column", editw=1, wide=False)
+        elif executeQuery(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{self.table_name.value}'", self.parentApp.database_connection) != []:
+            npyscreen.notify_confirm(f"Table: {self.table_name.value} already exists", editw=1, wide=False)
         else:
-            # instert entries to database
-            executeQuery(f"CREATE TABLE {self.table_name.value} ({','.join([f'{x[0]} {x[1]}' for x in self.entries])})", self.parentApp.database_connection)
-            
-            npyscreen.notify_wait(f"Created Table {self.table_name.value}", wide=False)
+            executeQuery(f"CREATE TABLE {self.table_name.value} ({', '.join([f'{x[0]} {x[1]}' for x in self.entries])})", self.parentApp.database_connection)
             self.parentApp.change_form("TABLE")
+            npyscreen.notify_wait(f"Created Table {self.table_name.value}", wide=False)
         
         
 class TableMenu(npyscreen.FormBaseNew):
