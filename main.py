@@ -68,28 +68,50 @@ class TablesMenu(npyscreen.FormBaseNew):
 
 class CreateTable(npyscreen.FormBaseNew):
     def create(self):
+        pass
+    def beforeEditing(self):
+        self._clear_all_widgets()
         self.name = "Create Table"
-        self.name = self.add(npyscreen.TitleText, name="Table Name: ")
-        self.add(npyscreen.ButtonPress, name="Create Table", when_pressed_function=self.on_ok, value=None)
-    def on_ok(self):
-        # create table
-        executeQuery(f"CREATE TABLE {self.name.value} (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)", self.parentApp.database_connection)
-        npyscreen.notify_wait(f"Created Table {self.name.value}", wide=False)
+        self.add(npyscreen.ButtonPress, name="Confrim", when_pressed_function=self.on_ok, value=None)
+        self.add(npyscreen.ButtonPress, name="Cancel", when_pressed_function=self.on_cancel, value=None)
+        self.table_name = self.add(npyscreen.TitleText, name="Table Name: ")
+        self.entries = []
+        self.entries_display = self.add_widget(npyscreen.MultiLineEdit, value="", max_height=5, editable=False)
+        self.column_name = self.add(npyscreen.TitleText, name="Column Name: ")
+        self.column_type = self.add(npyscreen.TitleSelectOne, name="Type: ", values=["INTEGER", "TEXT", "REAL", "BLOB"], value=[1,], scroll_exit=True, max_height=5)
+        self.add(npyscreen.ButtonPress, name="Save Column", when_pressed_function=self.saveColumn, value=None)
+    def saveColumn(self):
+        if self.column_name.value == "":
+            npyscreen.notify_confirm("Column name cannot be empty", editw=1, wide=False)
+        elif self.column_type.value == []:
+            npyscreen.notify_confirm("Please select a type", editw=1, wide=False)
+        else:
+            self.column_type.value = ["INTEGER", "TEXT", "REAL", "BLOB"][self.column_type.value[0]]
+            self.entries.append((self.column_name.value, self.column_type.value))
+            self.column_name.value = ""
+            self.column_type.value = [1,]
+            self.entries_display.value = "\n".join([f"{x[0]}: {x[1]}" for x in self.entries])
+            self.entries_display.display()
+
+        
+    
+    def on_cancel(self):
         self.parentApp.change_form("TABLE")
+        
+    def on_ok(self):
+        if self.entries == []:
+            npyscreen.notify_confirm("Please add atleast one column", editw=1, wide=False)
+        else:
+            # instert entries to database
+            executeQuery(f"CREATE TABLE {self.table_name.value} ({','.join([f'{x[0]} {x[1]}' for x in self.entries])})", self.parentApp.database_connection)
+            
+            npyscreen.notify_wait(f"Created Table {self.table_name.value}", wide=False)
+            self.parentApp.change_form("TABLE")
         
         
 class TableMenu(npyscreen.FormBaseNew):
     def create(self):
         self.name = "View Table"
-    # def on_ok(self):
-    #     self.parentApp.change_form("TABLE")
-    # def afterEditing(self):
-    #     self.parentApp.active_table = None
-    #     self.add(npyscreen.ButtonPress, name="Return", value_changed_callback=self.on_ok, value=None)
-    # def beforeEditing(self):
-    #     self.add(npyscreen.TitleText, name="Table Name: ", value=self.parentApp.active_table[0])
-    #     self.columns = executeQuery(f"PRAGMA table_info({self.parentApp.active_table[0]})", self.parentApp.database_connection)
-    #     self.add(npyscreen.TitleMultiSelect, name="Columns: ", values=str(self.columns), scroll_exit=True, max_height=5)
         
 def main():
     MyTUI().run()
